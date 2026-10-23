@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#126b70">
+  <title>NETRA AI — See the world differently</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="NETRA AI home">
+        <span class="brand-mark">◉</span>
+        <span>NETRA<span class="brand-ai"> AI</span><small>VISION ASSISTANT</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation"><a href="#home">Home</a><a href="#workspace">Explore Camera</a><a href="#ask-netra">Ask NETRA</a><a href="#mapTitle">Plan a Route</a><a href="#history">History</a><a href="#accessibility">Accessibility</a></nav>
+      <span class="status-pill"><span class="status-dot"></span> Prototype</span>
+    </header>
+
+    <main>
+      <section class="hero" id="home">
+        <div class="hero-copy">
+          <p class="eyebrow">YOUR WORLD, MORE ACCESSIBLE</p>
+          <h1>See beyond<br><span>what you see.</span></h1>
+          <p class="hero-text">A vision assistant prototype that can identify common objects and speak the results aloud. Start with your camera or upload a photo.</p>
+          <div class="hero-tags"><span>✦ Object detection</span><span>◖ Voice feedback</span><span>◎ Privacy-first demo</span></div>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="orbit-core">◉<small>NETRA</small></div>
+          <span class="orbit-label label-one">VISION</span><span class="orbit-label label-two">VOICE</span>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace">
+        <div class="section-heading">
+          <div><p class="eyebrow">LIVE WORKSPACE</p><h2>Vision assistant</h2></div>
+          <span id="modelStatus" class="model-status"><span class="mini-spinner"></span> Loading AI model…</span>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel camera-panel">
+            <div class="panel-heading"><div><span class="step-number">01</span><h3>Camera & image</h3></div><span class="live-label"><i></i> LIVE VIEW</span></div>
+            <div class="preview" id="preview">
+              <video id="video" autoplay playsinline muted></video>
+              <img id="uploadedImage" alt="Uploaded image preview">
+              <canvas id="overlay"></canvas>
+              <div class="empty-state" id="emptyState">
+                <div class="camera-icon">▣</div>
+                <strong>Your view starts here</strong>
+                <p>Turn on your camera or choose a photo to identify objects.</p>
+              </div>
+              <div class="preview-badge" id="previewBadge">Waiting for input</div>
+            </div>
+            <div class="camera-actions">
+              <button class="btn btn-primary" id="cameraBtn">▣ <span>Start camera</span></button>
+              <button class="btn btn-secondary" id="uploadBtn">↑ Upload photo</button>
+              <input id="fileInput" type="file" accept="image/*" hidden>
+              <button class="btn btn-ghost" id="stopBtn" disabled>Stop</button>
+            </div>
+            <p class="helper-text">Camera access requires permission and HTTPS. Object detection runs in your browser; the smaller-frame mode is tuned to reduce mobile processing time.</p>
+          </article>
+
+          <article class="panel results-panel" id="ask-netra">
+            <div class="panel-heading"><div><span class="step-number">02</span><h3>What NETRA sees</h3></div><span class="count-badge" id="objectCount">0 objects</span></div>
+            <div class="result-area" id="resultArea" aria-live="polite">
+              <div class="result-empty"><div class="scan-icon">⌕</div><strong>Ready to explore</strong><p>Start the camera or upload an image, then select <b>Detect objects</b>.</p></div>
+            </div>
+            <button class="btn btn-primary detect-btn" id="detectBtn" disabled>✧ Detect objects</button>
+            <button class="btn btn-secondary speak-btn" id="speakBtn" disabled>🔊 Read results aloud</button>
+            <div class="voice-box">
+              <div class="voice-icon">🎙</div><div class="voice-copy"><strong>Ask NETRA</strong><p id="voiceStatus">Voice input works in supported browsers (usually Chrome).</p></div>
+              <button class="mic-btn" id="micBtn" aria-label="Start voice input" title="Start voice input">🎤</button>
+            </div>
+            <div class="question-row"><input id="questionInput" type="text" placeholder="Ask a question or type here…" aria-label="Ask NETRA a question"><button id="askBtn" class="btn btn-secondary">Ask</button></div>
+            <p class="helper-text" id="answerText">Ask NETRA about the detected objects or your surroundings. AI answers depend on the connected backend and may be incorrect.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="map-section" aria-labelledby="mapTitle">
+        <div class="section-heading map-section-heading">
+          <div><p class="eyebrow">ACCESSIBLE EXPLORATION</p><h2 id="mapTitle">Map & nearby places</h2></div>
+          <span class="model-status">OpenStreetMap</span>
+        </div>
+        <article class="panel map-panel">
+          <div class="map-intro">
+            <div><h3>Find a place</h3><p>Use your location to search nearby services or open walking directions.</p></div>
+            <button class="btn btn-secondary" id="locateBtn" type="button">📍 My location</button>
+          </div>
+          <form id="mapSearchForm" class="map-search-form">
+            <label for="destinationInput">Destination or landmark</label>
+            <div class="map-search-row">
+              <input id="destinationInput" type="search" placeholder="e.g. nearest pharmacy, railway station" autocomplete="off">
+              <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+          </form>
+          <div id="netraMap" role="region" aria-label="Interactive map" tabindex="0"></div>
+          <p id="locationStatus" class="map-status" role="status" aria-live="polite">Location is off until you choose My location.</p>
+          <div class="map-actions">
+            <label class="nearby-label" for="nearbyCategory">Nearby services</label>
+            <select id="nearbyCategory">
+              <option value="pharmacy">Pharmacy</option>
+              <option value="hospital">Hospital</option>
+              <option value="cafe">Cafe</option>
+              <option value="restaurant">Restaurant</option>
+              <option value="bus_stop">Bus stop</option>
+              <option value="toilets">Public toilets</option>
+              <option value="atm">ATM</option>
+              <option value="grocery">Grocery / supermarket</option>
+              <option value="railway">Railway station</option>
+              <option value="library">Library</option>
+            </select>
+            <button class="btn btn-secondary" id="nearbyBtn" type="button">Find nearby</button>
+            <button class="btn btn-primary" id="routeBtn" type="button" disabled>Open walking directions</button>
+          </div>
+          <p id="mapMessage" class="helper-text" role="status" aria-live="polite">Map starts at a general view. Allow location access to centre it on you.</p>
+          <p class="map-safety-note">Safety note: map data may be incomplete or outdated. NETRA cannot verify that a route, crossing, pavement or nearby place is accessible or safe. Check with a trusted person when needed.</p>
+        </article>
+      </section>
+
+      <section class="feature-row" id="accessibility">
+        <div class="feature-card"><span>01</span><div class="feature-icon">⌖</div><h3>Object awareness</h3><p>Detect common objects such as people, chairs, bottles and more with a browser AI model.</p></div>
+        <div class="feature-card"><span>02</span><div class="feature-icon">♫</div><h3>Voice feedback</h3><p>Hear detection results through your device's built-in text-to-speech support.</p></div>
+        <div class="feature-card"><span>03</span><div class="feature-icon">◇</div><h3>Built for access</h3><p>High contrast, clear labels, keyboard-friendly controls and responsive layout.</p></div>
+      </section>
+
+      <div class="disclaimer" id="history"><span>ⓘ</span><p><b>Prototype safety note:</b> NETRA AI is a demonstration, not a certified navigation or safety device. Do not rely on its detections to cross roads or avoid hazards.</p></div>
+    </main>
+    <footer><span>◉ NETRA AI</span><span>Accessibility prototype · Camera AI runs in your browser · Map uses OpenStreetMap</span></footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
