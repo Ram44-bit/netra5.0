@@ -63,7 +63,7 @@
               <input id="fileInput" type="file" accept="image/*" hidden>
               <button class="btn btn-ghost" id="stopBtn" disabled>Stop</button>
             </div>
-            <p class="helper-text">Camera access requires permission and HTTPS. Object detection runs in your browser; the smaller-frame mode is tuned to reduce mobile processing time.</p>
+            <p class="helper-text">Camera access requires permission and HTTPS. Quick detection runs in your browser. Use Detailed AI scan for small items such as a pen, pencil, USB drive, charger or notebook; it needs the configured vision API and internet.</p>
           </article>
 
           <article class="panel results-panel" id="ask-netra">
@@ -71,7 +71,8 @@
             <div class="result-area" id="resultArea" aria-live="polite">
               <div class="result-empty"><div class="scan-icon">⌕</div><strong>Ready to explore</strong><p>Start the camera or upload an image, then select <b>Detect objects</b>.</p></div>
             </div>
-            <button class="btn btn-primary detect-btn" id="detectBtn" disabled>✧ Detect objects</button>
+            <button class="btn btn-primary detect-btn" id="detectBtn" disabled>✧ Quick detect</button>
+            <button class="btn btn-secondary detect-btn" id="detailedScanBtn" disabled>🔎 Detailed AI scan (small objects + expression)</button>
             <button class="btn btn-secondary speak-btn" id="speakBtn" disabled>🔊 Read results aloud</button>
             <div class="voice-box">
               <div class="voice-icon">🎙</div><div class="voice-copy"><strong>Ask NETRA</strong><p id="voiceStatus">Voice input works in supported browsers (usually Chrome).</p></div>
