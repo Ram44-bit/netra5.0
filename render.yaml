@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: netra-ai-frontend
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
