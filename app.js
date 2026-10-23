@@ -15,6 +15,7 @@
   const stopBtn = $("stopBtn");
   const detectBtn = $("detectBtn");
   const speakBtn = $("speakBtn");
+  const detailedScanBtn = $("detailedScanBtn");
   const micBtn = $("micBtn");
   const voiceStatus = $("voiceStatus");
   const questionInput = $("questionInput");
@@ -26,6 +27,7 @@
   let latestPredictions = [];
   let detectionTimer = null;
   let recognition = null;
+  let latestSpeechText = "";
 
   function setModelStatus(message, type = "") {
     modelStatus.className = "model-status " + type;
@@ -53,6 +55,7 @@
       try { await model.detect(warmup); } catch (_) { /* warmup is optional */ }
       setModelStatus("AI model ready", "ready");
       detectBtn.disabled = !(video.classList.contains("active") || uploadedImage.classList.contains("active"));
+      detailedScanBtn.disabled = detectBtn.disabled;
       previewBadge.textContent = "AI model ready";
       if (video.classList.contains("active")) startLiveDetection();
     } catch (err) {
@@ -89,6 +92,7 @@
       stopBtn.disabled = false;
       cameraBtn.querySelector("span").textContent = "Camera on";
       detectBtn.disabled = !model;
+      detailedScanBtn.disabled = false;
       previewBadge.textContent = "Camera is active";
       resizeOverlayToPreview();
       if (model) startLiveDetection();
@@ -112,6 +116,7 @@
     if (!uploadedImage.classList.contains("active")) {
       emptyState.hidden = false;
       detectBtn.disabled = true;
+      detailedScanBtn.disabled = true;
       previewBadge.textContent = "Waiting for input";
     }
   }
@@ -236,10 +241,27 @@
       return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
+    // Let browsers finish loading their installed voices before choosing Hindi.
+    latestSpeechText = String(text).replace(/\s+/g, " ").trim();
+    const utterance = new SpeechSynthesisUtterance(latestSpeechText);
+    const voices = window.speechSynthesis.getVoices();
+    const hindiVoice = voices.find(v => /^hi(-|_)/i.test(v.lang)) || voices.find(v => /hindi/i.test(v.name));
+    const indianEnglishVoice = voices.find(v => /^en-IN$/i.test(v.lang)) || voices.find(v => /^en(-|_)/i.test(v.lang));
+    const hasDevanagari = /[\u0900-\u097F]/.test(utterance.text);
+    if (hasDevanagari && hindiVoice) {
+      utterance.voice = hindiVoice;
+      utterance.lang = hindiVoice.lang || "hi-IN";
+    } else if (indianEnglishVoice) {
+      utterance.voice = indianEnglishVoice;
+      utterance.lang = indianEnglishVoice.lang || "en-IN";
+    } else {
+      utterance.lang = hasDevanagari ? "hi-IN" : "en-IN";
+    }
+    utterance.rate = 0.84;
     utterance.pitch = 1;
-    utterance.lang = "en-US";
+    utterance.volume = 1;
+    utterance.onstart = () => { voiceStatus.textContent = "Reading aloud in a slower, clearer voice…"; };
+    utterance.onerror = () => { voiceStatus.textContent = "Audio could not play. Check your browser's installed Hindi voices and volume."; };
     window.speechSynthesis.speak(utterance);
   }
 
@@ -249,10 +271,65 @@
       return;
     }
     const names = latestPredictions.slice(0, 8).map(p => p.class);
-    const uniqueNames = [...new Set(names)];
-    const text = `NETRA detected: ${uniqueNames.join(", ")}. Please remember, this is a prototype and may miss objects.`;
+    const labelsHi = { person: "व्यक्ति", book: "किताब या कॉपी", pen: "पेन", pencil: "पेंसिल", cup: "कप", bottle: "बोतल", cell_phone: "मोबाइल फोन", laptop: "लैपटॉप", keyboard: "कीबोर्ड", mouse: "माउस", backpack: "बैग", scissors: "कैंची", remote: "रिमोट", clock: "घड़ी", chair: "कुर्सी", tv: "टीवी" };
+    const uniqueNames = [...new Set(names.map(name => labelsHi[name] || name.replaceAll("_", " ")))];
+    const text = `NETRA को ये चीज़ें दिखाई दे रही हैं: ${uniqueNames.join(", ")}. यह शुरुआती पहचान है; छोटी चीज़ें छूट सकती हैं।`;
     if (updateStatus) voiceStatus.textContent = "Reading detection results aloud.";
     speakText(text);
+  }
+
+  async function detailedVisionScan() {
+    const source = uploadedImage.classList.contains("active") ? uploadedImage : video;
+    const isVideo = source === video;
+    const w = isVideo ? video.videoWidth : source.naturalWidth;
+    const h = isVideo ? video.videoHeight : source.naturalHeight;
+    if (!w || !h || (isVideo && (!stream || video.readyState < 2))) {
+      voiceStatus.textContent = "Pehle camera start karo ya ek clear photo upload karo.";
+      return;
+    }
+    detailedScanBtn.disabled = true;
+    const oldLabel = detailedScanBtn.textContent;
+    detailedScanBtn.textContent = "◌ Analysing image…";
+    voiceStatus.textContent = "Detailed vision AI image ko dhyan se check kar raha hai. Ismein kuch seconds lag sakte hain.";
+    try {
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 1280 / Math.max(w, h));
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      canvas.getContext("2d", { alpha: false }).drawImage(source, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.88));
+      if (!blob) throw new Error("Could not prepare image");
+      const form = new FormData();
+      form.append("image", blob, "netra-capture.jpg");
+      form.append("question", "Hindi mein image ka detailed visual scan karo. Chhote objects—pendrive/USB drive, pen, pencil, charger/cable, notebook/copy—ko specifically check karo. Agar koi person ka face clearly visible ho toh sirf apparent visible expression ko cautious estimate ke roop mein batao. Sabse pehle sabse clear object aur uski image mein position batao. Jo cheez confirm na ho uske baare mein uncertainty clearly bolo.");
+      form.append("language", "Hindi");
+      const response = await fetch(`${API_BASE}/api/describe`, { method: "POST", body: form });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Vision service error (${response.status})`);
+      const description = String(data.description || "Image ka description nahi mil saka.").trim();
+      answerText.textContent = description;
+      resultArea.innerHTML = "";
+      const summary = document.createElement("div");
+      summary.className = "result-empty";
+      const strong = document.createElement("strong");
+      strong.textContent = "Detailed AI scan complete";
+      const paragraph = document.createElement("p");
+      paragraph.textContent = description;
+      summary.append(strong, paragraph);
+      resultArea.appendChild(summary);
+      objectCount.textContent = "Detailed scan";
+      speakBtn.disabled = false;
+      voiceStatus.textContent = "Detailed scan ready. Hindi audio sunne ke liye Read results aloud dabao.";
+      speakText(description);
+      previewBadge.textContent = "Detailed AI scan complete";
+    } catch (err) {
+      console.warn("Detailed vision scan failed", err);
+      voiceStatus.textContent = `Detailed scan failed: ${err.message}. Backend par GEMINI_API_KEY aur FRONTEND_ORIGIN check karo.`;
+      answerText.textContent = "Small-object scan ke liye backend vision API zaroori hai. Render backend environment mein GEMINI_API_KEY add karke redeploy karo.";
+    } finally {
+      detailedScanBtn.disabled = !(video.classList.contains("active") || uploadedImage.classList.contains("active"));
+      detailedScanBtn.textContent = oldLabel;
+    }
   }
 
   function setupSpeechRecognition() {
@@ -263,7 +340,7 @@
       return;
     }
     recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
+    recognition.lang = "hi-IN";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
@@ -331,6 +408,7 @@
       uploadedImage.classList.add("active");
       emptyState.hidden = true;
       detectBtn.disabled = !model;
+      detailedScanBtn.disabled = false;
       previewBadge.textContent = "Photo ready for detection";
       clearOverlay();
       resizeOverlayToPreview();
@@ -339,7 +417,8 @@
     uploadedImage.src = url;
   });
   detectBtn.addEventListener("click", detectCurrentImage);
-  speakBtn.addEventListener("click", () => speakResults(true));
+  detailedScanBtn.addEventListener("click", detailedVisionScan);
+  speakBtn.addEventListener("click", () => latestSpeechText ? speakText(latestSpeechText) : speakResults(true));
   micBtn.addEventListener("click", () => {
     if (recognition) {
       try { recognition.start(); } catch (e) { voiceStatus.textContent = "Voice input is already listening."; }
@@ -351,6 +430,7 @@
     if (video.classList.contains("active") && latestPredictions.length) drawPredictions(latestPredictions, video.videoWidth, video.videoHeight);
     else if (uploadedImage.classList.contains("active") && latestPredictions.length) drawPredictions(latestPredictions, uploadedImage.naturalWidth, uploadedImage.naturalHeight);
   });
+  if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
   setupSpeechRecognition();
   loadModel();
 })();
